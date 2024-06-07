@@ -3,6 +3,8 @@ package api
 import (
 	"html/template"
 	"net/http"
+
+	"gochat/internal/handlers"
 )
 
 type server struct {
@@ -20,6 +22,9 @@ func (s *server) InitAPI() error {
 	fs := http.FileServer(http.Dir("../internal/static"))
 
 	router.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	auth := handlers.InitAuth(router)
+	auth.InitAuthAPI()
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		templ := template.Must(template.ParseFiles("../internal/views/index.html"))

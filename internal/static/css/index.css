@@ -1,0 +1,12 @@
+.hide_alert {
+	animation: hide_alert 3s forwards
+}
+
+@keyframes hide_alert {
+	0% {
+		width: 100%;
+	}
+	100% {
+		width: 0%;
+	}
+}
