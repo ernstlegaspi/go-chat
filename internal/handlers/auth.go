@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"gochat/internal/utils"
 	"net/http"
 	"strings"
@@ -32,6 +33,9 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 	var email string = r.FormValue("email")
 	var name string = strings.TrimSpace(r.FormValue("name"))
 	var password string = r.FormValue("password")
+	hashedPassword := make(chan string, 1)
+	hashError := make(chan error, 1)
+	startTime := time.Now()
 
 	if email == "" || name == "" || password == "" {
 		utils.AlertError(http.StatusBadRequest, w, "All Fields are required.")
@@ -58,12 +62,20 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(password), 14)
+	go func() {
+		// hp = hashed password
+		hp, hsErr := bcrypt.GenerateFromPassword([]byte(password), 10)
 
-	if hashErr != nil {
-		utils.AlertError(http.StatusInternalServerError, w, "Internal Server Error")
-		return
-	}
+		if hsErr != nil {
+			hashError <- hsErr
+			return
+		}
+
+		hashedPassword <- string(hp)
+
+		close(hashedPassword)
+		close(hashError)
+	}()
 
 	tx, txErr := a.db.Begin()
 
@@ -87,35 +99,49 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var id int
+	select {
+	case hp := <-hashedPassword:
+		var id int
 
-	var query string = `
-		insert into users (createdAt, name, email, password, updatedAt)
-		values (NOW, $1, $2, $3, NOW())
+		var query string = `
+		insert into users (createdAt, name, email, image, password, updatedAt)
+		values (NOW(), $1, $2, $3, $4, NOW())
 		returning id
 	`
 
-	err := tx.QueryRow(
-		query,
-		name,
-		email,
-		hashedPassword,
-	).Scan(&id)
+		err := tx.QueryRow(
+			query,
+			email,
+			"test image",
+			name,
+			hp,
+		).Scan(&id)
 
-	if err != nil {
-		utils.AlertError(http.StatusInternalServerError, w, "Internal Server Error")
-		return
+		if err != nil {
+			fmt.Println(err)
+			utils.AlertError(http.StatusInternalServerError, w, "Internal Server Error")
+			return
+		}
+
+		token := utils.CreateJWT(id)
+
+		cookie := &http.Cookie{
+			Name:     "session_token",
+			HttpOnly: true,
+			Value:    token,
+			Path:     "/",
+			Expires:  time.Now().Add(7 * 24 * time.Hour),
+		}
+
+		http.SetCookie(w, cookie)
+
+		fmt.Printf("\n Time Since: %s \n", time.Since(startTime))
+		utils.AlertSuccess(201, w, "Registered successfully.")
+	case he := <-hashError:
+		if he != nil {
+			fmt.Printf("\nError: %v\n", <-hashError)
+			utils.AlertError(http.StatusInternalServerError, w, "Internal Server Error")
+			return
+		}
 	}
-
-	token := utils.CreateJWT(id)
-
-	cookie := &http.Cookie{
-		Name:     "session_token",
-		HttpOnly: true,
-		Value:    token,
-		Path:     "/",
-		Expires:  time.Now().Add(7 * 24 * time.Hour),
-	}
-
-	http.SetCookie(w, cookie)
 }

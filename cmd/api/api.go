@@ -1,11 +1,10 @@
 package api
 
 import (
-	"html/template"
-	"net/http"
-
 	"gochat/internal/db"
 	"gochat/internal/handlers"
+	"html/template"
+	"net/http"
 )
 
 type server struct {

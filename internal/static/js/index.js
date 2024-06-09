@@ -41,3 +41,7 @@ document.addEventListener("animationend", e => {
 		alert.parentNode.removeChild(alert)
 	}
 })
+
+document.addEventListener("htmx:responseError", e => {
+  if(e.detail.xhr.status === 400) document.getElementById("error-message").innerHTML = e.detail.xhr.responseText
+})

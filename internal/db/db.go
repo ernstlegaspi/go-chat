@@ -12,7 +12,7 @@ type db struct {
 }
 
 func CreateDB() (*db, *sql.DB) {
-	conn := "user=postgres dbname=postgres password=inventory-management sslmode=disable"
+	conn := "user=postgres dbname=postgres password=gochat sslmode=disable"
 
 	dbConn, err := sql.Open("postgres", conn)
 
@@ -20,8 +20,6 @@ func CreateDB() (*db, *sql.DB) {
 		fmt.Println(err)
 		panic(err)
 	}
-
-	defer dbConn.Close()
 
 	return &db{
 		db: dbConn,
@@ -39,8 +37,9 @@ func (d *db) createUserTable() error {
 	query := `create table if not exists users (
 		id serial primary key,
 		createdAt timestamp,
-		name varchar(50),
 		email varchar(100),
+		image text,
+		name varchar(50),
 		password text,
 		updatedAt timestamp
 	)`
