@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 
+	"gochat/internal/db"
 	"gochat/internal/handlers"
 )
 
@@ -21,9 +22,13 @@ func (s *server) InitAPI() error {
 	router := http.NewServeMux()
 	fs := http.FileServer(http.Dir("../internal/static"))
 
+	dbs, database := db.CreateDB()
+
+	dbs.CreateTables()
+
 	router.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	auth := handlers.InitAuth(router)
+	auth := handlers.InitAuth(database, router)
 	auth.InitAuthAPI()
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
