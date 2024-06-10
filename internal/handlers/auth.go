@@ -29,6 +29,7 @@ func (a *auth) InitAuthAPI() {
 	var r *http.ServeMux = a.router
 
 	r.HandleFunc("POST /login", a.login)
+	r.HandleFunc("POST /logout", a.logout)
 	r.HandleFunc("POST /register", a.register)
 }
 
@@ -215,4 +216,18 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func (a *auth) logout(w http.ResponseWriter, r *http.Request) {
+	cookie := &http.Cookie{
+		Name:     "session_token",
+		HttpOnly: true,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+	}
+
+	http.SetCookie(w, cookie)
+	w.WriteHeader(200)
 }
