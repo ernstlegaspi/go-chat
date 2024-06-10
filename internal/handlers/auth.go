@@ -28,12 +28,16 @@ func InitAuth(db *sql.DB, router *http.ServeMux) *auth {
 func (a *auth) InitAuthAPI() {
 	var r *http.ServeMux = a.router
 
+	r.HandleFunc("POST /login", a.login)
 	r.HandleFunc("POST /register", a.register)
 }
 
 func (a *auth) login(w http.ResponseWriter, r *http.Request) {
-	var email string = r.FormValue("email")
-	var password string = r.FormValue("password")
+	var email string = r.FormValue("login-email")
+	var password string = r.FormValue("login-password")
+	existingUserID := make(chan int, 1)
+	existingUserPassword := make(chan string, 1)
+	existingUserError := make(chan error, 1)
 
 	if len(email) < 7 {
 		utils.AlertError(http.StatusBadRequest, w, "Email should be 8 characters or more.")
@@ -42,6 +46,47 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 
 	if len(password) < 7 {
 		utils.AlertError(http.StatusBadRequest, w, "Password should be 8 characters or more.")
+		return
+	}
+
+	go func() {
+		var userID int
+		var userPassword string
+
+		err := a.db.QueryRow("select id, password from users where email = $1", email).Scan(&userID, &userPassword)
+
+		if err != nil {
+			existingUserError <- err
+			close(existingUserID)
+			close(existingUserError)
+			close(existingUserPassword)
+
+			return
+		}
+
+		existingUserID <- userID
+		existingUserPassword <- userPassword
+
+		close(existingUserID)
+		close(existingUserError)
+		close(existingUserPassword)
+	}()
+
+	select {
+	case userID := <-existingUserID:
+		pw := <-existingUserPassword
+		err := bcrypt.CompareHashAndPassword([]byte(pw), []byte(password))
+
+		if err != nil {
+			utils.AlertError(http.StatusNotFound, w, "User not existing.")
+			return
+		}
+
+		utils.SetCookie(w, userID)
+
+	case err := <-existingUserError:
+		fmt.Println(err)
+		utils.AlertError(http.StatusNotFound, w, "User not existing.")
 		return
 	}
 }
@@ -54,7 +99,6 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	hashedPassword := make(chan string, 1)
 	hashError := make(chan error, 1)
-	emailExistingErr := make(chan error, 1)
 	emailExistingID := make(chan int, 1)
 
 	if email == "" || name == "" || password == "" {
@@ -89,7 +133,6 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 
 		emailExistingID <- user.ID
 
-		close(emailExistingErr)
 		close(emailExistingID)
 	}()
 
@@ -160,23 +203,14 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		token := utils.CreateJWT(id)
-
-		cookie := &http.Cookie{
-			Name:     "session_token",
-			HttpOnly: true,
-			Value:    token,
-			Path:     "/",
-			Expires:  time.Now().Add(7 * 24 * time.Hour),
-		}
-
-		http.SetCookie(w, cookie)
+		utils.SetCookie(w, id)
 
 		fmt.Printf("\n Time Since: %s \n", time.Since(startTime))
+
 		utils.AlertSuccess(201, w, "Registered successfully.")
 	case he := <-hashError:
 		if he != nil {
-			fmt.Printf("\nError: %v\n", <-hashError)
+			fmt.Printf("\nError: %v\n", he)
 			utils.AlertError(http.StatusInternalServerError, w, "Internal Server Error")
 			return
 		}

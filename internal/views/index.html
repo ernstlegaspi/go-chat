@@ -7,7 +7,7 @@
 		<meta name="description" content="A chat application where you can have conversation with your friends online whatsoever." />
 		<script src="https://cdn.tailwindcss.com"></script>
 		<script src="https://unpkg.com/htmx.org@1.9.2" integrity="sha384-L6OqL9pRWyyFU3+/bjdSri+iIphTN/bvYyM37tICVyOJkWZLpP2vGn6VUEXgzg6h" crossorigin="anonymous"></script>
-		<title>Inventory Management</title>
+		<title>GoChat</title>
 		<link rel="stylesheet" href="/static/css/index.css" />
 	</head>
 	<body class="w-full h-[100vh] text-[#1d1d1d] bg-[#E9E9E9]">
@@ -41,11 +41,11 @@
 						<button type="submit" class="py-2 rounded border border-[#1d1d1d] text-white bg-[#1d1d1d] w-[100px] hover:bg-black">Register</button>
 					</div>
 				</form>
-				<form id="login-form" class="block px-4 mt-4">
+				<form id="login-form" hx-post="/login" hx-target="#alert-message" hx-swap="innerHTML" class="block px-4 mt-4">
 					<p class="font-medium mb-1">Email</p>
-					<input type="email" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
+					<input id="login-email" name="login-email" type="email" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
 					<p class="font-medium mb-1">Password</p>
-					<input type="password" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
+					<input id="login-password" name="login-password" type="password" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
 					<div class="flex justify-end">
 						<button class="py-2 rounded border border-[#1d1d1d] text-white bg-[#1d1d1d] w-[100px] hover:bg-black">Login</button>
 					</div>
@@ -91,7 +91,37 @@
 				registerForm.classList.add("block")
 			})
 
-			registerForm.addEventListener("htmx:configRequest", async e => {
+			loginForm.addEventListener("htmx:configRequest", e => {
+				const email = getID("login-email").value
+				const password = getID("login-password").value
+
+				if(!email || !password) {
+					e.preventDefault()
+					alert("All fields are required.")
+					return
+				}
+
+				if(password.length < 8) {
+					e.preventDefault()
+					alert("Password should be 8 characters.")
+					return
+				}
+
+				if(email.length < 8) {
+					e.preventDefault()
+					alert("Email should be 8 characters.")
+					return
+				}
+			})
+
+			loginForm.addEventListener("htmx:afterRequest", e => {
+				if(!e.detail.successful) return
+
+				history.pushState(null, "", "/home")
+				window.location.reload()
+			})
+
+			registerForm.addEventListener("htmx:configRequest", e => {
 				const name = getID("name").value
 				const email = getID("email").value
 				const password = getID("password").value
@@ -134,6 +164,13 @@
 				}
 			})
 
+			registerForm.addEventListener("htmx:afterRequest", e => {
+				if(!e.detail.successful) return
+
+				history.pushState(null, "", "/home")
+				window.location.reload()
+			})
+
 			document.addEventListener("animationend", e => {
 				if(e.animationName === "hide_alert") {
 					const alert = document.getElementById("alert")
@@ -145,7 +182,7 @@
 			document.addEventListener("htmx:responseError", e => {
 				const code = e.detail.xhr.status
 				
-				if(code === 400 || code === 409) document.getElementById("error-message").innerHTML = e.detail.xhr.responseText
+				if(code === 400 || code === 404 || code === 409) document.getElementById("error-message").innerHTML = e.detail.xhr.responseText
 			})
 		</script>
 		<!-- <script src="/static/js/index.js"></script> -->

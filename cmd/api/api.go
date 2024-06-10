@@ -3,8 +3,10 @@ package api
 import (
 	"gochat/internal/db"
 	"gochat/internal/handlers"
-	"html/template"
+	"gochat/internal/utils"
 	"net/http"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type server struct {
@@ -31,8 +33,41 @@ func (s *server) InitAPI() error {
 	auth.InitAuthAPI()
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		templ := template.Must(template.ParseFiles("../internal/views/index.html"))
-		templ.Execute(w, nil)
+		cookie, err := r.Cookie("session_token")
+
+		if err != nil || cookie == nil {
+			utils.ExecHTML(w, "index.html")
+			return
+		}
+
+		token, tokenErr := utils.ParseJWT(cookie.Value)
+
+		if tokenErr != nil {
+			utils.ExecHTML(w, "index.html")
+			return
+		}
+
+		tokenID := token.Claims.(jwt.MapClaims)["id"]
+
+		if tokenID == 0 {
+			utils.ExecHTML(w, "index.html")
+			return
+		}
+
+		var userID int
+
+		queryErr := database.QueryRow("select id from users where id = $1", tokenID).Scan(&userID)
+
+		if queryErr != nil || userID == 0 {
+			utils.ExecHTML(w, "index.html")
+			return
+		}
+
+		utils.ExecHTML(w, "home.html")
+	})
+
+	router.HandleFunc("/home", func(w http.ResponseWriter, r *http.Request) {
+		utils.ExecHTML(w, "home.html")
 	})
 
 	sv := &http.Server{
