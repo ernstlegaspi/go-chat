@@ -26,13 +26,13 @@
 				</div>
 				<form hx-post="/register" hx-target="#alert-message" hx-swap="innerHTML" id="register-form" class="px-4 mt-4 hidden">
 					<p class="font-medium mb-1">Name</p>
-					<input type="name" name="name" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
+					<input id="name" type="name" name="name" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
 					<p class="font-medium mb-1">Email</p>
-					<input type="email" name="email" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
+					<input id="email" type="email" name="email" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
 					<p class="font-medium mb-1">Password</p>
-					<input type="password" name="password" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
+					<input type="password" id="password" name="password" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
 					<p class="font-medium mb-1">Confirm Password</p>
-					<input type="password" name="confirm-password" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
+					<input type="password" id="confirm-password" name="confirm-password" class="outline-none p-2 rounded border border-gray-300 w-full mb-4" />
 					<div class="cursor-pointer transition-all font-medium w-full h-[100px] border border-dashed border-gray-300 rounded mb-4 flex items-center justify-center hover:bg-gray-300">
 						<svg xmlns="http://www.w3.org/2000/svg" class="w-[22px] h-[22px] mr-1" viewBox="0 0 24 24"><path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2M8.9 13.98l2.1 2.53l3.1-3.99c.2-.26.6-.26.8.01l3.51 4.68a.5.5 0 0 1-.4.8H6.02c-.42 0-.65-.48-.39-.81L8.12 14c.19-.26.57-.27.78-.02"/></svg>
 						<p>Upload Profile Picture</p>
@@ -52,6 +52,102 @@
 				</form>
 			</div>
 		</div>
-		<script src="/static/js/index.js"></script>
+		<script>
+			const getID = id => document.getElementById(id)
+
+			const loginButton = document.getElementById("login-button")
+			const registerButton = document.getElementById("register-button")
+			const loginForm = document.getElementById("login-form")
+			const registerForm = document.getElementById("register-form")
+
+			const activeClass = ["bg-[#1d1d1d]", "text-white"]
+			const notActiveClass = ["bg-white", "text-[#1d1d1d]", "hover:bg-[#1d1d1d]", "hover:text-white"]
+
+			loginButton.addEventListener("click", () => {
+				registerButton.classList.remove(...activeClass)
+				registerButton.classList.add(...notActiveClass)
+
+				loginButton.classList.add(...activeClass)
+				loginButton.classList.remove(...notActiveClass)
+
+				registerForm.classList.remove("block")
+				registerForm.classList.add("hidden")
+
+				loginForm.classList.remove("hidden")
+				loginForm.classList.add("block")
+			})
+
+			registerButton.addEventListener("click", () => {
+				loginButton.classList.remove(...activeClass)
+				loginButton.classList.add(...notActiveClass)
+
+				registerButton.classList.add(...activeClass)
+				registerButton.classList.remove(...notActiveClass)
+
+				loginForm.classList.remove("block")
+				loginForm.classList.add("hidden")
+
+				registerForm.classList.remove("hidden")
+				registerForm.classList.add("block")
+			})
+
+			registerForm.addEventListener("htmx:configRequest", async e => {
+				const name = getID("name").value
+				const email = getID("email").value
+				const password = getID("password").value
+				const confirmPassword = getID("confirm-password").value
+
+				if(!name || !email || !password || !confirmPassword) {
+					e.preventDefault()
+					alert("All fields are required.")
+					return
+				}
+
+				if(password !== confirmPassword) {
+					e.preventDefault()
+					alert("Passwords should be equal")
+					return
+				}
+
+				if(password.length < 7 || confirmPassword.length < 7) {
+					e.preventDefault()
+					alert("Password shoud be 7 characters.")
+					return
+				}
+
+				if(!/^[a-zA-Z ]+$/.test(name)) {
+					e.preventDefault()
+					alert("Name should be letters and spaces only.")
+					return
+				}
+
+				if(name.length < 4) {
+					e.preventDefault()
+					alert("Name should be 8 characters.")
+					return
+				}
+
+				if(email.length < 8) {
+					e.preventDefault()
+					alert("Email should be 8 characters.")
+					return
+				}
+			})
+
+			document.addEventListener("animationend", e => {
+				if(e.animationName === "hide_alert") {
+					const alert = document.getElementById("alert")
+
+					alert.parentNode.removeChild(alert)
+				}
+			})
+
+			document.addEventListener("htmx:responseError", e => {
+				const code = e.detail.xhr.status
+				
+				if(code === 400 || code === 409) document.getElementById("error-message").innerHTML = e.detail.xhr.responseText
+			})
+		</script>
+		<!-- <script src="/static/js/index.js"></script> -->
 	</body>
 </html>

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"gochat/internal/models"
+
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -29,13 +31,31 @@ func (a *auth) InitAuthAPI() {
 	r.HandleFunc("POST /register", a.register)
 }
 
+func (a *auth) login(w http.ResponseWriter, r *http.Request) {
+	var email string = r.FormValue("email")
+	var password string = r.FormValue("password")
+
+	if len(email) < 7 {
+		utils.AlertError(http.StatusBadRequest, w, "Email should be 8 characters or more.")
+		return
+	}
+
+	if len(password) < 7 {
+		utils.AlertError(http.StatusBadRequest, w, "Password should be 8 characters or more.")
+		return
+	}
+}
+
 func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 	var email string = r.FormValue("email")
 	var name string = strings.TrimSpace(r.FormValue("name"))
 	var password string = r.FormValue("password")
+
+	startTime := time.Now()
 	hashedPassword := make(chan string, 1)
 	hashError := make(chan error, 1)
-	startTime := time.Now()
+	emailExistingErr := make(chan error, 1)
+	emailExistingID := make(chan int, 1)
 
 	if email == "" || name == "" || password == "" {
 		utils.AlertError(http.StatusBadRequest, w, "All Fields are required.")
@@ -61,6 +81,17 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 		utils.AlertError(http.StatusBadRequest, w, "Password should be 8 characters or more.")
 		return
 	}
+
+	go func() {
+		user := new(models.User)
+
+		a.db.QueryRow("select id from users where email = $1", email).Scan(&user.ID)
+
+		emailExistingID <- user.ID
+
+		close(emailExistingErr)
+		close(emailExistingID)
+	}()
 
 	go func() {
 		// hp = hashed password
@@ -101,13 +132,19 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case hp := <-hashedPassword:
+		existingID := <-emailExistingID
+
+		if existingID != 0 {
+			utils.AlertError(http.StatusConflict, w, "Email already existing.")
+			return
+		}
+
 		var id int
 
-		var query string = `
-		insert into users (createdAt, name, email, image, password, updatedAt)
-		values (NOW(), $1, $2, $3, $4, NOW())
-		returning id
-	`
+		var query string = `insert into users (createdAt, email, image, name, password, updatedAt)
+			values (NOW(), $1, $2, $3, $4, NOW())
+			returning id
+		`
 
 		err := tx.QueryRow(
 			query,
