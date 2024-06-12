@@ -10,15 +10,24 @@
 		<title>GoChat</title>
 		<link rel="stylesheet" href="/static/css/index.css" />
 	</head>
-	<body>
-		<h1>Home page</h1>
-		<!-- <script>
+	<body class="flex w-full h-[100vh]">
+		<div class="h-full w-[300px] border-r border-gray-300 flex flex-col justify-between pb-4">
+			<div hx-get="/users" hx-trigger="load">
+			</div>
+			<div class="px-4">
+				<button id="logout" class="rounded border border-gray-300 w-full py-2 font-medium transition-all hover:bg-[#1d1d1d] hover:text-white">Logout</button>
+			</div>
+		</div>
+		<div class="h-full flex flex-1 items-center justify-center">
+			<p>Click someone to start a chat with.</p>
+		</div>
+		<script>
 			const logout = document.getElementById("logout")
 
 			logout.addEventListener("htmx:afterRequest", e => {
 				history.pushState(null, "", "/")
 				window.location.reload()
 			})
-		</script> -->
+		</script>
 	</body>
 </html>

@@ -39,6 +39,7 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	existingUserID := make(chan int, 1)
 	existingUserPassword := make(chan string, 1)
 	existingUserError := make(chan error, 1)
+	existingUserName := make(chan string, 1)
 
 	if len(email) < 7 {
 		utils.AlertError(http.StatusBadRequest, w, "Email should be 8 characters or more.")
@@ -53,29 +54,34 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		var userID int
 		var userPassword string
+		var userName string
 
-		err := a.db.QueryRow("select id, password from users where email = $1", email).Scan(&userID, &userPassword)
+		err := a.db.QueryRow("select id, name, password from users where email = $1", email).Scan(&userID, &userName, &userPassword)
 
 		if err != nil {
 			existingUserError <- err
 			close(existingUserID)
 			close(existingUserError)
 			close(existingUserPassword)
+			close(existingUserName)
 
 			return
 		}
 
 		existingUserID <- userID
+		existingUserName <- userName
 		existingUserPassword <- userPassword
 
 		close(existingUserID)
 		close(existingUserError)
 		close(existingUserPassword)
+		close(existingUserName)
 	}()
 
 	select {
 	case userID := <-existingUserID:
 		pw := <-existingUserPassword
+		name := <-existingUserName
 		err := bcrypt.CompareHashAndPassword([]byte(pw), []byte(password))
 
 		if err != nil {
@@ -83,7 +89,7 @@ func (a *auth) login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		utils.SetCookie(w, userID)
+		utils.SetCookie(w, userID, name)
 
 	case err := <-existingUserError:
 		fmt.Println(err)
@@ -204,7 +210,7 @@ func (a *auth) register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		utils.SetCookie(w, id)
+		utils.SetCookie(w, id, name)
 
 		fmt.Printf("\n Time Since: %s \n", time.Since(startTime))
 

@@ -5,8 +5,6 @@ import (
 	"gochat/internal/handlers"
 	"gochat/internal/utils"
 	"net/http"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type server struct {
@@ -32,24 +30,14 @@ func (s *server) InitAPI() error {
 	auth := handlers.InitAuth(database, router)
 	auth.InitAuthAPI()
 
+	user := handlers.InitUser(database, router)
+	user.InitUserAPI()
+
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session_token")
+		claims, err := utils.HasJWT(r)
+		tokenID := claims["id"]
 
-		if err != nil || cookie == nil {
-			utils.ExecHTML(w, "index.html")
-			return
-		}
-
-		token, tokenErr := utils.ParseJWT(cookie.Value)
-
-		if tokenErr != nil {
-			utils.ExecHTML(w, "index.html")
-			return
-		}
-
-		tokenID := token.Claims.(jwt.MapClaims)["id"]
-
-		if tokenID == 0 {
+		if err != nil || tokenID == 0 {
 			utils.ExecHTML(w, "index.html")
 			return
 		}

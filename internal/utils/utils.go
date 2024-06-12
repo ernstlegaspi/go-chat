@@ -29,6 +29,24 @@ func LettersAndSpaces(str string) bool {
 	return regex.MatchString(str)
 }
 
+func HasJWT(r *http.Request) (jwt.MapClaims, error) {
+	cookie, err := r.Cookie("session_token")
+
+	if err != nil || cookie == nil {
+		return nil, err
+	}
+
+	token, parseErr := ParseJWT(cookie.Value)
+
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	mapClaims := token.Claims.(jwt.MapClaims)
+
+	return mapClaims, nil
+}
+
 func ParseJWT(token string) (*jwt.Token, error) {
 	return jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -39,11 +57,12 @@ func ParseJWT(token string) (*jwt.Token, error) {
 	})
 }
 
-func SetCookie(w http.ResponseWriter, id int) {
+func SetCookie(w http.ResponseWriter, id int, name string) {
 	expiration := time.Second * time.Duration(3600*24*7)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id":      id,
+		"name":    name,
 		"expires": expiration,
 	})
 
